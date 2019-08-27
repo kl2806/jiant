@@ -1067,8 +1067,8 @@ class MultiTaskModel(nn.Module):
             appen_mask2 = sent_mask2[:, 1:].squeeze(2) * (
                 scale2 >= batch["bad_prefix_length"] + batch["shared_word_length"]
             ).to(torch.float)
-            prefix_mask1 = sent_mask1[:, 1:].squeeze(2) * (scale1 < batch["good_prefix_length"]).to(torch.float)
-            prefix_mask2 = sent_mask2[:, 1:].squeeze(2) * (scale2 < batch["bad_prefix_length"]).to(torch.float)
+            pref_mask1 = sent_mask1[:, 1:].squeeze(2) * (scale1 < batch["good_prefix_length"]).to(torch.float)
+            pref_mask2 = sent_mask2[:, 1:].squeeze(2) * (scale2 < batch["bad_prefix_length"]).to(torch.float)
             appen_entropy1 = (entropy1 * appen_mask1).sum(dim=1)
             appen_entropy2 = (entropy2 * appen_mask2).sum(dim=1)
             appen_logits1 = torch.sum(lm_logits1 * appen_mask1, dim=1)
