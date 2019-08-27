@@ -66,7 +66,7 @@ from jiant.tasks.acceptablity import (
     BlimpTask,
     BlimpOnePrefixLMTask,
     BlimpTwoPrefixLMTask,
-    BlimpFullSentLMTask
+    BlimpFullSentLMTask,
 )
 from jiant.utils import config
 from jiant.utils.utils import (
@@ -774,6 +774,7 @@ class MultiTaskModel(nn.Module):
         self.elmo = args.input_module == "elmo"
         self.use_pytorch_transformers = input_module_uses_pytorch_transformers(args.input_module)
         self.sep_embs_for_skip = args.sep_embs_for_skip
+        self.file = open("%s_%s_peephole.jsonl" % (args.exp_name, args.run_name), "w")
 
     def forward(self, task, batch, predict=False):
         """
@@ -971,46 +972,60 @@ class MultiTaskModel(nn.Module):
         tokenizer_name = list(batch["input1"].keys())[0]
         input1 = batch["input1"][tokenizer_name]
         input2 = batch["input2"][tokenizer_name]
-        scale1 = torch.arange(1, input1.size()[1], dtype=torch.long, device=input1.device).unsqueeze(0)
-        scale2 = torch.arange(1, input2.size()[1], dtype=torch.long, device=input2.device).unsqueeze(0)
+        scale1 = torch.arange(
+            1, input1.size()[1], dtype=torch.long, device=input1.device
+        ).unsqueeze(0)
+        scale2 = torch.arange(
+            1, input2.size()[1], dtype=torch.long, device=input2.device
+        ).unsqueeze(0)
         sent_embs1, sent_mask1 = self.sent_encoder(batch["input1"], task)
         sent_embs2, sent_mask2 = self.sent_encoder(batch["input2"], task)
         target1 = batch["input1"]["token_id"]
         target2 = batch["input2"]["token_id"]
-        lm_logits1 = torch.gather(lm_head(sent_embs1[:, :-1, :]), dim=2, index=target1[:, 1:].unsqueeze(2)).squeeze(2)
-        lm_logits2 = torch.gather(lm_head(sent_embs2[:, :-1, :]), dim=2, index=target2[:, 1:].unsqueeze(2)).squeeze(2)
+        lm_pred1 = lm_head(sent_embs1[:, :-1, :])
+        lm_pred2 = lm_head(sent_embs2[:, :-1, :])
+        lm_logits1 = torch.gather(lm_pred1, dim=2, index=target1[:, 1:].unsqueeze(2)).squeeze(2)
+        lm_logits2 = torch.gather(lm_pred2, dim=2, index=target2[:, 1:].unsqueeze(2)).squeeze(2)
         logit_mask1 = sent_mask1[:, 1:].squeeze(2)
         logit_mask2 = sent_mask2[:, 1:].squeeze(2)
         if isinstance(task, BlimpOnePrefixLMTask):
-            logit_mask1 = logit_mask1 * ((scale1 >= batch["shared_prefix_length"]) * \
-                 (scale1 < batch["shared_prefix_length"] + batch["good_word_length"])).to(torch.float)
-            logit_mask2 = logit_mask2 * ((scale2 >= batch["shared_prefix_length"]) * \
-                 (scale2 < batch["shared_prefix_length"] + batch["bad_word_length"])).to(torch.float)   
+            logit_mask1 = logit_mask1 * (
+                (scale1 >= batch["shared_prefix_length"])
+                * (scale1 < batch["shared_prefix_length"] + batch["good_word_length"])
+            ).to(torch.float)
+            logit_mask2 = logit_mask2 * (
+                (scale2 >= batch["shared_prefix_length"])
+                * (scale2 < batch["shared_prefix_length"] + batch["bad_word_length"])
+            ).to(torch.float)
         elif isinstance(task, BlimpTwoPrefixLMTask):
-            logit_mask1 = logit_mask1 * ((scale1 >= batch["good_prefix_length"]) * \
-                 (scale1 < batch["good_prefix_length"] + batch["shared_word_length"])).to(torch.float)
-            logit_mask2 = logit_mask2 * ((scale2 >= batch["bad_prefix_length"]) * \
-                 (scale2 < batch["bad_prefix_length"] + batch["shared_word_length"])).to(torch.float)
+            logit_mask1 = logit_mask1 * (
+                (scale1 >= batch["good_prefix_length"])
+                * (scale1 < batch["good_prefix_length"] + batch["shared_word_length"])
+            ).to(torch.float)
+            logit_mask2 = logit_mask2 * (
+                (scale2 >= batch["bad_prefix_length"])
+                * (scale2 < batch["bad_prefix_length"] + batch["shared_word_length"])
+            ).to(torch.float)
         elif isinstance(task, BlimpFullSentLMTask):
             pass
         elif isinstance(task, NPIClozePairTask):
             logit_mask1 *= (scale1 == batch["index"]).to(torch.float)
             logit_mask2 *= (scale1 == batch["index"]).to(torch.float)
-        pref_logits1 = torch.sum(lm_logits1*logit_mask1, dim=1)
-        pref_logits2 = torch.sum(lm_logits2*logit_mask2, dim=1)
+        pref_logits1 = torch.sum(lm_logits1 * logit_mask1, dim=1)
+        pref_logits2 = torch.sum(lm_logits2 * logit_mask2, dim=1)
         logits = torch.stack([pref_logits1, pref_logits2], dim=1)
 
-        import random
-        roll = random.randint(0, 50)
-        if (roll == 42):
-            log.info("Random check")
-            log.info("Sentence Good: %s" % batch["sent1_str"][0])
-            log.info("Logits:\n %s" % (lm_logits1*sent_mask1[:, 1:].squeeze(2))[0].__str__())
-            log.info("Mask:\n %s" % logit_mask1[0].__str__())
-            log.info("Sentence Bad: " + batch["sent2_str"][0])
-            log.info("Logits:\n %s" % (lm_logits2*sent_mask2[:, 1:].squeeze(2))[0].__str__())
-            log.info("Mask:\n %s" % logit_mask2[0].__str__())
-            log.info("Result: %s\n" % logits[0])
+        # import random
+        # roll = random.randint(0, 50)
+        # if (roll == 42):
+        #     log.info("Random check")
+        #     log.info("Sentence Good: %s" % batch["sent1_str"][0])
+        #     log.info("Logits:\n %s" % (lm_logits1*sent_mask1[:, 1:].squeeze(2))[0].__str__())
+        #     log.info("Mask:\n %s" % logit_mask1[0].__str__())
+        #     log.info("Sentence Bad: " + batch["sent2_str"][0])
+        #     log.info("Logits:\n %s" % (lm_logits2*sent_mask2[:, 1:].squeeze(2))[0].__str__())
+        #     log.info("Mask:\n %s" % logit_mask2[0].__str__())
+        #     log.info("Result: %s\n" % logits[0])
 
         out["logits"] = logits
         out["n_exs"] = get_batch_size(batch)
@@ -1020,6 +1035,60 @@ class MultiTaskModel(nn.Module):
             labels = labels.squeeze(-1) if len(labels.size()) > 1 else labels
             out["loss"] = F.cross_entropy(logits, labels)
             task.update_metrics(logits, labels, tagmask=tagmask)
+
+        if isinstance(task, BlimpFullSentLMTask):
+            for i in range(out["n_exs"]):
+                output = {
+                    "lm_prob1": pref_logits1[i].tolist(),
+                    "lm_prob2": pref_logits2[i].tolist(),
+                    "sent_mask1": sent_mask1[:, 1:].squeeze(2)[i].tolist(),
+                    "sent_mask2": sent_mask2[:, 1:].squeeze(2)[i].tolist(),
+                }
+                self.file.write(json.dumps(output)+'\n')
+        elif isinstance(BlimpOnePrefixLMTask):
+            entropy1 = -(torch.exp(lm_pred1) * lm_pred1).sum(dim=-1)
+            entropy2 = -(torch.exp(lm_pred2) * lm_pred2).sum(dim=-1)
+            appen_mask1 = sent_mask1[:, 1:].squeeze(2) * (scale1 >= batch["shared_prefix_length"] + batch["good_word_length"])
+            appen_mask2 = sent_mask2[:, 2:].squeeze(2) * (scale2 >= batch["shared_prefix_length"] + batch["bad_word_length"])
+            appen_entropy1 = (entropy1 * appen_mask1).sum(dim=1)
+            appen_entropy2 = (entropy2 * appen_mask2).sum(dim=1)
+            appen_logits1 = torch.sum(lm_logits1 * appen_mask1, dim=1)
+            appen_logits2 = torch.sum(lm_logits2 * appen_mask2, dim=1)
+            for i in range(out["n_exs"]):
+                output = {
+                    "appen_entropy1": appen_entropy1[i].tolist(),
+                    "appen_entropy2": appen_entropy2[i].tolist(),
+                    "crit_logits1": pref_logits1[i].tolist(),
+                    "crit_logits2": pref_logits2[i].tolist(),
+                    "appen_logits1": appen_logits1[i].tolist(),
+                    "appen_logits2": appen_logits2[i].tolist(),
+                }
+                self.file.write(json.dumps(output)+'\n')
+        elif isinstance(BlimpTwoPrefixLMTask):
+            entropy1 = -(torch.exp(lm_pred1) * lm_pred1).sum(dim=-1)
+            entropy2 = -(torch.exp(lm_pred2) * lm_pred2).sum(dim=-1)
+            appen_mask1 = sent_mask1[:, 1:].squeeze(2) * (scale1 >= batch["good_prefix_length"] + batch["shared_word_length"])
+            appen_mask2 = sent_mask2[:, 2:].squeeze(2) * (scale2 >= batch["bad_prefix_length"] + batch["shared_word_length"])
+            prefix_mask1 = sent_mask1[:, 1:].squeeze(2) * (scale1 < batch["good_prefix_length"])
+            prefix_mask2 = sent_mask2[:, 1:].squeeze(2) * (scale2 < batch["good_prefix_length"])
+            appen_entropy1 = (entropy1 * appen_mask1).sum(dim=1)
+            appen_entropy2 = (entropy2 * appen_mask2).sum(dim=1)
+            appen_logits1 = torch.sum(lm_logits1 * appen_mask1, dim=1)
+            appen_logits2 = torch.sum(lm_logits2 * appen_mask2, dim=1)
+            pref_logits1 = torch.sum(lm_logits1 * pref_mask1, dim=1)
+            pref_logits2 = torch.sum(lm_logits2 * pref_mask2, dim=1)
+            for i in range(out["n_exs"]):
+                output = {
+                    "appen_entropy1": appen_entropy1[i].tolist(),
+                    "appen_entropy2": appen_entropy2[i].tolist(),
+                    "crit_logits1": pref_logits1[i].tolist(),
+                    "crit_logits2": pref_logits2[i].tolist(),
+                    "appen_logits1": appen_logits1[i].tolist(),
+                    "appen_logits2": appen_logits2[i].tolist(),
+                    "pref_logits1": pref_logits1[i].tolist(),
+                    "pref_logits2": pref_logits2[i].tolist(),
+                }
+                self.file.write(json.dumps(output)+'\n')            
 
         if predict:
             _, out["preds"] = logits.max(dim=1)
@@ -1047,7 +1116,7 @@ class MultiTaskModel(nn.Module):
             ),
             dim=1,
         )
-        
+
         out["logits"] = logits
         out["n_exs"] = get_batch_size(batch)
         tagmask = batch.get("tagmask", None)
