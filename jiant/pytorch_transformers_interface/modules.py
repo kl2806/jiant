@@ -249,9 +249,30 @@ class BertEmbedderModule(PytorchTransformersEmbedderModule):
     def __init__(self, args):
         super(BertEmbedderModule, self).__init__(args)
 
-        self.model = pytorch_transformers.BertModel.from_pretrained(
-            args.input_module, cache_dir=self.cache_dir, output_hidden_states=True
-        )
+        if args.pretrained_dir is not None and args.pretrained_dir != "None":
+            if "RANDOM" in args.pretrained_dir:
+                log.warning("LOADING A RANDOMLY WEIGHTS BERT")
+                config = pytorch_transformers.BertConfig()
+                config.output_hidden_states=True
+                self.model = pytorch_transformers.BertModel(config)
+                pretrained_model = pytorch_transformers.BertModel.from_pretrained(
+                    args.input_module, cache_dir=self.cache_dir, output_hidden_states=True
+                )
+                if args.pretrained_dir == "RANDOM_WITH_GOOD_EMBEDDINGS":
+                    for untrained_module, pretrained_module in zip(self.model.modules(), pretrained_model.modules()):
+                        if isinstance(untrained_module, torch.nn.Embedding):
+                            untrained_module.weight = pretrained_module.weight
+
+            else:
+                log.warning("LOADING A FUNETUNED MODEL from: ")
+                log.warning(args.pretrained_dir)
+                self.model = pytorch_transformers.BertModel.from_pretrained(
+                    args.pretrained_dir, cache_dir=self.cache_dir, output_hidden_states=True
+                )
+        else: 
+            self.model = pytorch_transformers.BertModel.from_pretrained(
+                args.input_module, cache_dir=self.cache_dir, output_hidden_states=True
+            )
         self.max_pos = self.model.config.max_position_embeddings
 
         self.tokenizer = pytorch_transformers.BertTokenizer.from_pretrained(
@@ -615,3 +636,4 @@ class XLMEmbedderModule(PytorchTransformersEmbedderModule):
         lm_head = model_with_lm_head.pred_layer
         lm_head.proj.weight = self.model.embeddings.weight
         return nn.Sequential(lm_head, nn.LogSoftmax(dim=-1))
+

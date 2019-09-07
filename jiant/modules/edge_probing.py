@@ -36,10 +36,11 @@ class EdgeClassifierModule(nn.Module):
     """
 
     def _make_span_extractor(self):
-        if self.span_pooling == "attn":
-            return SelfAttentiveSpanExtractor(self.proj_dim)
-        else:
-            return EndpointSpanExtractor(self.proj_dim, combination=self.span_pooling)
+        #if self.span_pooling == "attn":
+        #    return SelfAttentiveSpanExtractor(self.proj_dim)
+        #else:
+        #return EndpointSpanExtractor(self.proj_dim, combination=self.span_pooling)
+        return EndpointSpanExtractor(self.proj_dim)
 
     def _make_cnn_layer(self, d_inp):
         """Make a CNN layer as a projection of local context.
@@ -96,9 +97,12 @@ class EdgeClassifierModule(nn.Module):
 
         # Classifier gets concatenated projections of span1, span2
         clf_input_dim = self.span_extractors[1].get_output_dim()
-        if not self.single_sided:
+        if not self.single_sided: # nonlinear for two spans
             clf_input_dim += self.span_extractors[2].get_output_dim()
-        self.classifier = Classifier.from_params(clf_input_dim, task.n_classes, task_params)
+            self.classifier = Classifier.from_params(clf_input_dim, task.n_classes, task_params)
+        else:  # linear for 1 span
+            task_params['cls_type'] = 'log_reg'
+            self.classifier = Classifier.from_params(clf_input_dim, task.n_classes, task_params)
 
     def forward(
         self,
@@ -233,3 +237,4 @@ class EdgeClassifierModule(nn.Module):
             return F.binary_cross_entropy(torch.sigmoid(logits), labels.float())
         else:
             raise ValueError("Unsupported loss type '%s' " "for edge probing." % self.loss_type)
+
