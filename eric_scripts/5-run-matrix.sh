@@ -5,22 +5,23 @@ declare -a ALL_TASKS
 # ALL_TASKS+=( "spr1" )
 # ALL_TASKS+=( "spr2" )
 # ALL_TASKS+=( "dpr" )
-# ALL_TASKS+=( "dep-ud-ewt" )
+ ALL_TASKS+=( "dep-ud-ewt" )
 # ALL_TASKS+=( "nonterminal-ontonotes" )
 # ALL_TASKS+=( "pos-ontonotes" )
-# ALL_TASKS+=( "ner-ontonotes" )
+ALL_TASKS+=( "ner-ontonotes" )
 ALL_TASKS+=( "srl-ontonotes" )
-# ALL_TASKS+=( "coref-ontonotes" )
-# ALL_TASKS+=( "rel-semeval" )
+ALL_TASKS+=( "coref-ontonotes" )
+ALL_TASKS+=( "rel-semeval" )
 echo "All tasks to run: ${ALL_TASKS[@]}"
 
 declare -a ALL_MODELS
-ALL_MODELS+=( "None" ) # bert has pretrained_dir to None
-ALL_MODELS+=( "RANDOM" )
-ALL_MODELS+=( "RANDOM_WITH_GOOD_EMBEDDINGS" )
+#ALL_MODELS+=( "None" ) # bert has pretrained_dir to None
+#ALL_MODELS+=( "RANDOM" )
+#ALL_MODELS+=( "RANDOM_WITH_GOOD_EMBEDDINGS" )
 #ALL_MODELS+=( "models/MNLI" )
 #ALL_MODELS+=( "coreference" )
-#ALL_MODELS+=( "sst" )
+ALL_MODELS+=( "models/SST" )
+ALL_MODELS+=(" models/5-way-multiqa
 
 declare -a All_LAYERS
 All_LAYERS+=( "cat" )
