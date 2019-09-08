@@ -1,10 +1,12 @@
 curl -O https://downloads.rclone.org/rclone-current-linux-amd64.zip
 unzip rclone-current-linux-amd64.zip
 cd rclone-*-linux-amd64
-mkdir /home/ericwallace/bin
-cp rclone /home/ericwallace/bin
-chmod 755 /home/ericwallace/bin/rclone
-cd /home/ericwallace/jiant
-cp eric_scripts/rclone.conf /home/ericwallace/.config/rclone/rclone.conf
+mkdir /data/kevinlin/bin
+cp rclone /data/kevinlin/bin
+chmod 755 /data/kevinlin/bin/rclone
+cd /data/kevinlin/jiant
+mkdir /data/kevinlin/.config
+mkdir /data/kevinlin/.config/rclone
+cp eric_scripts/rclone.conf /data/kevinlin/.config/rclone/rclone.conf
 rm rclone-current-linux-amd64.zip
 rm -rf rclone-current-linux-amd64.zip

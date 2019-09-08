@@ -18,10 +18,11 @@ declare -a ALL_MODELS
 #ALL_MODELS+=( "None" ) # bert has pretrained_dir to None
 #ALL_MODELS+=( "RANDOM" )
 #ALL_MODELS+=( "RANDOM_WITH_GOOD_EMBEDDINGS" )
-#ALL_MODELS+=( "models/MNLI" )
-#ALL_MODELS+=( "coreference" )
+ALL_MODELS+=( "models/MNLI" )
+# ALL_MODELS+=( "coreference" )
 ALL_MODELS+=( "models/SST" )
-ALL_MODELS+=(" models/5-way-multiqa
+ALL_MODELS+=("models/5-way-multiqa")
+ALL_MODELS+=("models/squad")
 
 declare -a All_LAYERS
 All_LAYERS+=( "cat" )
@@ -30,7 +31,7 @@ All_LAYERS+=( "mix" )
 All_LAYERS+=( "top" )
 
 CURRENT_RUNNING_JOBS=0
-AVAILABLE_CUDA_DEVICES=(0 1 2 3 4 5 6 7)
+AVAILABLE_CUDA_DEVICES=(4 5 6 7)
 for task in "${ALL_TASKS[@]}"
 do
 	for model in "${ALL_MODELS[@]}"
